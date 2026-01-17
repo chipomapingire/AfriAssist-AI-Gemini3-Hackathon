@@ -2,8 +2,7 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { UserProfile } from "./types";
 
-const API_KEY = process.env.API_KEY || "";
-
+// Always use getGeminiClient to ensure a fresh instance with the correct API key.
 export const getGeminiClient = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
 };
@@ -17,7 +16,9 @@ export interface SearchFilters {
 export const searchOpportunities = async (query: string, profile?: UserProfile, filters?: SearchFilters) => {
   const ai = getGeminiClient();
   
-  let contextualPrompt = `Find recent jobs, business opportunities, or grants specifically in African markets. Provide actionable links.`;
+  let contextualPrompt = `Find recent jobs, business opportunities, or grants specifically in African markets. 
+  PRIORITIZE results from legitimate job boards such as LinkedIn, Indeed, Jobberman, BrighterMonday, Glassdoor, and official government/NGO portals. 
+  Ensure the links provided are direct and verified.`;
   
   if (query) {
     contextualPrompt += ` Primary Search Query: ${query}.`;
@@ -42,7 +43,7 @@ export const searchOpportunities = async (query: string, profile?: UserProfile, 
     contents: contextualPrompt,
     config: {
       tools: [{ googleSearch: {} }],
-      systemInstruction: "You are AfriAssist AI. Help users find real, vetted opportunities in Africa. Always provide direct URLs."
+      systemInstruction: "You are AfriAssist AI. Help users find real, vetted opportunities in Africa. Always provide direct URLs from trusted sources like LinkedIn, Jobberman, or Indeed. Avoid suspicious or scam-prone sites."
     },
   });
 
@@ -77,10 +78,85 @@ export const generateSpeech = async (text: string, voice: string = 'Kore') => {
   return base64Audio;
 };
 
+export const analyzeMedia = async (base64Data: string, mimeType: string) => {
+  const ai = getGeminiClient();
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-pro-preview',
+    contents: {
+      parts: [
+        { inlineData: { data: base64Data, mimeType } },
+        { text: "Analyze this pitch. Rate clarity, confidence, and presence. Provide feedback on Global Accent Clarity. IMPORTANT: Identify specific visual areas on the face (mouth, jaw, eyes) that contribute to or detract from clarity. Provide coordinates (x, y as 0-100) and a label for these articulation zones for a heatmap overlay." }
+      ]
+    },
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          score: { type: Type.NUMBER },
+          feedback: { type: Type.STRING },
+          recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+          facial_markers: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                x: { type: Type.NUMBER },
+                y: { type: Type.NUMBER },
+                label: { type: Type.STRING },
+                clarity: { type: Type.STRING, description: "low, medium, or high" }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  return JSON.parse(response.text);
+};
+
+export const reviewDocument = async (base64Data: string, mimeType: string) => {
+  const ai = getGeminiClient();
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-pro-preview',
+    contents: {
+      parts: [
+        { inlineData: { data: base64Data, mimeType } },
+        { text: "Analyze this resume/CV. Provide a professional score (1-100), detailed feedback, and specific improvements. Identify 3-5 specific snippets of text for improvement with originalText, suggestedText, and reason." }
+      ]
+    },
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          score: { type: Type.NUMBER },
+          feedback: { type: Type.STRING },
+          recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+          highlights: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                originalText: { type: Type.STRING },
+                suggestedText: { type: Type.STRING },
+                reason: { type: Type.STRING }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  return JSON.parse(response.text);
+};
+
 export const searchLocalMap = async (query: string, location: { lat: number, lng: number }) => {
   const ai = getGeminiClient();
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-latest",
+    model: "gemini-2.5-flash", // Using the required 2.5 series model for Maps Grounding.
     contents: `Find business centers, job hubs, or networking spots near ${query} around these coordinates.`,
     config: {
       tools: [{ googleMaps: {} }],
@@ -127,69 +203,6 @@ export const generateProfessionalAvatar = async (profile: UserProfile) => {
   throw new Error("No image generated");
 };
 
-export const reviewDocument = async (base64Data: string, mimeType: string) => {
-  const ai = getGeminiClient();
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: {
-      parts: [
-        { inlineData: { data: base64Data, mimeType } },
-        { text: "Analyze this resume/CV. Provide a professional score (1-100), detailed feedback, and specific improvements. Identify 3-5 specific snippets of text for improvement with originalText, suggestedText, and reason." }
-      ]
-    },
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          score: { type: Type.NUMBER },
-          feedback: { type: Type.STRING },
-          recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
-          highlights: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                originalText: { type: Type.STRING },
-                suggestedText: { type: Type.STRING },
-                reason: { type: Type.STRING }
-              }
-            }
-          }
-        }
-      }
-    }
-  });
-
-  return JSON.parse(response.text);
-};
-
-export const analyzeMedia = async (base64Data: string, mimeType: string) => {
-  const ai = getGeminiClient();
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: {
-      parts: [
-        { inlineData: { data: base64Data, mimeType } },
-        { text: "Analyze this pitch. Rate clarity, confidence, and presence. Provide feedback on Global Accent Clarity and actionable recommendations." }
-      ]
-    },
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          score: { type: Type.NUMBER },
-          feedback: { type: Type.STRING },
-          recommendations: { type: Type.ARRAY, items: { type: Type.STRING } }
-        }
-      }
-    }
-  });
-
-  return JSON.parse(response.text);
-};
-
 export const translateText = async (text: string, targetLanguage: string) => {
   const ai = getGeminiClient();
   const response = await ai.models.generateContent({
@@ -201,7 +214,7 @@ export const translateText = async (text: string, targetLanguage: string) => {
 };
 
 export const generateMotivationalVideo = async (prompt: string, onProgress: (msg: string) => void) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+  const ai = getGeminiClient();
   onProgress("Initializing cinematic engine...");
   let operation = await ai.models.generateVideos({
     model: 'veo-3.1-fast-generate-preview',
@@ -216,12 +229,12 @@ export const generateMotivationalVideo = async (prompt: string, onProgress: (msg
   }
 
   const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+  // Append API key when fetching from download link as per VEO requirements.
   const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
   const blob = await response.blob();
   return URL.createObjectURL(blob);
 };
 
-// PCM Encoding/Decoding Utilities
 export function decodeBase64(base64: string) {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -241,6 +254,7 @@ export function encodeBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
+// Manual PCM decoding logic for Gemini API audio streams.
 export async function decodeAudioData(
   data: Uint8Array,
   ctx: AudioContext,

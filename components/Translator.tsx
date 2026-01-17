@@ -1,27 +1,59 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { translateText, generateSpeech, decodeBase64 } from '../geminiService';
+import { translateText, generateSpeech, decodeBase64, decodeAudioData } from '../geminiService';
+
+const LANG_PREFS_KEY = 'afriassist_lang_prefs';
 
 const Translator: React.FC = () => {
   const [text, setText] = useState('');
+  const [sourceLang, setSourceLang] = useState('Auto-Detect');
   const [targetLang, setTargetLang] = useState('English');
   const [loading, setLoading] = useState(false);
   const [translated, setTranslated] = useState('');
   const [copySuccess, setCopySuccess] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
-  const languages = [
-    'English', 'French', 'Portuguese', 'Swahili', 'Hausa', 'Yoruba', 'Amharic', 'Arabic', 'Zulu', 'Igbo', 'Kinyarwanda', 'Shona'
+  const africanLanguages = [
+    'Swahili', 'Hausa', 'Yoruba', 'Amharic', 'Arabic', 'Zulu', 'Igbo', 
+    'Kinyarwanda', 'Shona', 'Oromo', 'Somali', 'Twi', 'Wolof', 'Afrikaans'
   ];
 
-  const handleTranslate = useCallback(async (inputText: string, lang: string) => {
+  const globalLanguages = [
+    'English', 'French', 'Portuguese', 'Spanish', 'Chinese (Mandarin)', 'Hindi', 'German'
+  ];
+
+  const allLanguages = [...africanLanguages, ...globalLanguages].sort();
+
+  // Load preferences from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(LANG_PREFS_KEY);
+    if (saved) {
+      try {
+        const { source, target } = JSON.parse(saved);
+        if (source) setSourceLang(source);
+        if (target) setTargetLang(target);
+      } catch (e) {
+        console.error("Failed to load language preferences", e);
+      }
+    }
+  }, []);
+
+  // Save preferences to localStorage
+  useEffect(() => {
+    localStorage.setItem(LANG_PREFS_KEY, JSON.stringify({ source: sourceLang, target: targetLang }));
+  }, [sourceLang, targetLang]);
+
+  const handleTranslate = useCallback(async (inputText: string, sLang: string, tLang: string) => {
     if (!inputText.trim()) {
       setTranslated('');
       return;
     }
     setLoading(true);
     try {
-      const res = await translateText(inputText, lang);
+      const prompt = sLang === 'Auto-Detect' 
+        ? inputText 
+        : `From ${sLang}: ${inputText}`;
+      const res = await translateText(prompt, tLang);
       setTranslated(res || '');
     } catch (err) {
       console.error(err);
@@ -34,14 +66,14 @@ const Translator: React.FC = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (text.trim()) {
-        handleTranslate(text, targetLang);
+        handleTranslate(text, sourceLang, targetLang);
       } else {
         setTranslated('');
       }
     }, 800);
 
     return () => clearTimeout(timer);
-  }, [text, targetLang, handleTranslate]);
+  }, [text, sourceLang, targetLang, handleTranslate]);
 
   const handleCopy = () => {
     if (!translated) return;
@@ -59,7 +91,8 @@ const Translator: React.FC = () => {
       if (base64Audio) {
         const audioBytes = decodeBase64(base64Audio);
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-        const buffer = await audioContext.decodeAudioData(audioBytes.buffer);
+        // Correct usage of manual PCM decoding as API returns raw PCM data.
+        const buffer = await decodeAudioData(audioBytes, audioContext, 24000, 1);
         const source = audioContext.createBufferSource();
         source.buffer = buffer;
         source.connect(audioContext.destination);
@@ -88,16 +121,25 @@ const Translator: React.FC = () => {
         {/* Input Section */}
         <div className="flex flex-col space-y-4">
           <div className="flex justify-between items-center px-4">
-            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Original Thought</span>
-            <div className="flex items-center space-x-4">
-              <span className="text-[10px] font-bold text-orange-600 bg-orange-100 px-3 py-1 rounded-full uppercase tracking-wider">Auto-Detecting</span>
-              <button 
-                onClick={() => setText('')}
-                className="text-[10px] text-slate-400 font-black hover:text-orange-600 transition-all uppercase tracking-widest"
+            <div className="flex flex-col">
+              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Input Language</span>
+              <select 
+                value={sourceLang}
+                onChange={(e) => setSourceLang(e.target.value)}
+                className="mt-1 bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-[10px] font-black outline-none focus:border-orange-500 shadow-sm transition-all cursor-pointer hover:border-orange-200"
               >
-                Clear
-              </button>
+                <option value="Auto-Detect">✨ Auto-Detect</option>
+                {allLanguages.map(lang => (
+                  <option key={`source-${lang}`} value={lang}>{lang}</option>
+                ))}
+              </select>
             </div>
+            <button 
+              onClick={() => setText('')}
+              className="text-[10px] text-slate-400 font-black hover:text-orange-600 transition-all uppercase tracking-widest"
+            >
+              Clear Text
+            </button>
           </div>
           <div className="relative flex-1 group">
             <textarea
@@ -117,16 +159,18 @@ const Translator: React.FC = () => {
         {/* Output Section */}
         <div className="flex flex-col space-y-4">
           <div className="flex justify-between items-center px-4">
-            <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Translated Insight</span>
-            <select 
-              value={targetLang}
-              onChange={(e) => setTargetLang(e.target.value)}
-              className="bg-white border-2 border-slate-100 rounded-2xl px-5 py-2 text-xs font-black outline-none focus:border-orange-500 shadow-sm transition-all cursor-pointer hover:border-orange-200"
-            >
-              {languages.map(lang => (
-                <option key={lang} value={lang}>{lang}</option>
-              ))}
-            </select>
+            <div className="flex flex-col">
+              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Output Language</span>
+              <select 
+                value={targetLang}
+                onChange={(e) => setTargetLang(e.target.value)}
+                className="mt-1 bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-[10px] font-black outline-none focus:border-orange-500 shadow-sm transition-all cursor-pointer hover:border-orange-200"
+              >
+                {allLanguages.map(lang => (
+                  <option key={`target-${lang}`} value={lang}>{lang}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="relative flex-1 group">
             <div className="w-full h-full min-h-[350px] p-10 bg-slate-900 text-white rounded-[3rem] shadow-2xl overflow-y-auto border-8 border-slate-800 relative">
@@ -168,7 +212,7 @@ const Translator: React.FC = () => {
                     </svg>
                   ) : (
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1" />
                     </svg>
                   )}
                 </button>

@@ -10,28 +10,48 @@ interface ProfileProps {
 
 const Profile: React.FC<ProfileProps> = ({ profile, onSave }) => {
   const [formData, setFormData] = useState<UserProfile>(profile);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
 
+  const validate = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.fullName.trim()) newErrors.fullName = 'Please provide your professional name.';
+    if (!formData.location.trim()) newErrors.location = 'A location hub is required to find local opportunities.';
+    if (!formData.skills.trim()) newErrors.skills = 'At least one core skill is required for AI matching.';
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    if (validate()) {
+      onSave(formData);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    // Clear error for this field as user types
+    if (errors[name]) {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
   };
 
   const handleGenerateAvatar = async () => {
     if (!formData.fullName || !formData.skills) {
-      alert("Please enter your name and skills first!");
+      alert("Please enter your name and skills first to personalize the headshot!");
       return;
     }
     
-    // Check for API Key selection for Gemini 3 Image
     if (!(window as any).aistudio?.hasSelectedApiKey || !(await (window as any).aistudio.hasSelectedApiKey())) {
       await (window as any).aistudio.openSelectKey();
     }
@@ -92,26 +112,34 @@ const Profile: React.FC<ProfileProps> = ({ profile, onSave }) => {
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-xl space-y-6 lg:col-span-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Professional Name</label>
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 flex justify-between">
+                <span>Professional Name</span>
+                {errors.fullName && <span className="text-red-500 normal-case tracking-normal font-bold">Required</span>}
+              </label>
               <input
                 type="text"
                 name="fullName"
                 value={formData.fullName}
                 onChange={handleChange}
                 placeholder="e.g. Kofi Mensah"
-                className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-orange-500 outline-none transition-all font-semibold"
+                className={`w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl focus:border-orange-500 outline-none transition-all font-semibold ${errors.fullName ? 'border-red-200 bg-red-50/30' : 'border-transparent'}`}
               />
+              {errors.fullName && <p className="text-[10px] text-red-500 font-bold ml-1">{errors.fullName}</p>}
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Location Hub</label>
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 flex justify-between">
+                <span>Location Hub</span>
+                {errors.location && <span className="text-red-500 normal-case tracking-normal font-bold">Required</span>}
+              </label>
               <input
                 type="text"
                 name="location"
                 value={formData.location}
                 onChange={handleChange}
                 placeholder="e.g. Lagos, Nigeria"
-                className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-orange-500 outline-none transition-all font-semibold"
+                className={`w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl focus:border-orange-500 outline-none transition-all font-semibold ${errors.location ? 'border-red-200 bg-red-50/30' : 'border-transparent'}`}
               />
+              {errors.location && <p className="text-[10px] text-red-500 font-bold ml-1">{errors.location}</p>}
             </div>
           </div>
 
@@ -144,14 +172,18 @@ const Profile: React.FC<ProfileProps> = ({ profile, onSave }) => {
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Skill Stack</label>
+            <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1 flex justify-between">
+              <span>Skill Stack</span>
+              {errors.skills && <span className="text-red-500 normal-case tracking-normal font-bold">Required</span>}
+            </label>
             <textarea
               name="skills"
               value={formData.skills}
               onChange={handleChange}
               placeholder="What are your core powers? e.g. React, Logistics, Sales..."
-              className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-orange-500 outline-none transition-all h-28 resize-none font-semibold"
+              className={`w-full px-5 py-4 bg-slate-50 border-2 rounded-2xl focus:border-orange-500 outline-none transition-all h-28 resize-none font-semibold ${errors.skills ? 'border-red-200 bg-red-50/30' : 'border-transparent'}`}
             />
+            {errors.skills && <p className="text-[10px] text-red-500 font-bold ml-1">{errors.skills}</p>}
           </div>
 
           <div className="space-y-2">
