@@ -1,0 +1,9 @@
+{
+  "name": "AfriAssist AI",
+  "description": "A Gemini 3-powered assistant helping Africans access jobs, business opportunities, and professional coaching through resume review and accent correction.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
