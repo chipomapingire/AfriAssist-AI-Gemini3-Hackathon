@@ -9,7 +9,7 @@ export interface Message {
   }>;
 }
 
-export type FeatureTab = 'profile' | 'jobs' | 'resume' | 'resume-maker' | 'coach' | 'translate' | 'coach-live' | 'admin';
+export type FeatureTab = 'profile' | 'jobs' | 'resume' | 'resume-maker' | 'coach' | 'translate' | 'coach-live' | 'admin' | 'about';
 
 export interface UserProfile {
   fullName: string;

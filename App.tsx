@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { FeatureTab, UserProfile, SpecialCode } from './types';
 import Header from './components/Header';
 import JobSearch from './components/JobSearch';
@@ -17,12 +17,12 @@ import AuthModal from './components/AuthModal';
 import SupportModal from './components/SupportModal';
 import GuestGate from './components/GuestGate';
 import Home from './components/Home';
+import About from './components/About';
 
 const STORAGE_KEY = 'afriassist_active_user';
 const ADMIN_KEY = 'afriassist_admin_auth';
 const CODES_KEY = 'afriassist_master_codes';
 
-// The secret bypass list
 const VIP_BYPASS_NAMES = [
   'AfriAdmin', 
   'Chipo-VIP', 
@@ -54,8 +54,8 @@ const App: React.FC = () => {
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
+  const [isProfileBannerDismissed, setIsProfileBannerDismissed] = useState(false);
 
-  // Load profile and check subscription
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     const adminAuth = localStorage.getItem(ADMIN_KEY);
@@ -82,14 +82,7 @@ const App: React.FC = () => {
           setIsGuestNamed(!!parsed.fullName);
           if (parsed.email !== 'guest@afriassist.ai') {
             setIsLoggedIn(true);
-            const installDate = new Date(parsed.installDate || new Date().toISOString());
-            const now = new Date();
-            const diffDays = Math.floor((now.getTime() - installDate.getTime()) / (1000 * 3600 * 24));
-            if (diffDays >= 3 && !parsed.isSubscribed) {
-              setShowPaywall(true);
-            }
           }
-          // Check VIP status
           if (VIP_BYPASS_NAMES.includes(parsed.fullName)) {
              setProfile(prev => ({...prev, isSubscribed: true}));
           }
@@ -108,6 +101,12 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const isProfileIncomplete = useMemo(() => {
+    // Only consider meaningful "non-guest" naming or specific data points as "incomplete"
+    // If name is set but location or skills are missing, it's incomplete.
+    return isGuestNamed && (!profile.location || !profile.skills);
+  }, [isGuestNamed, profile.location, profile.skills]);
+
   const handleGuestEntry = (name: string) => {
     const isVIP = VIP_BYPASS_NAMES.includes(name);
     const guestUser: UserProfile = {
@@ -118,10 +117,6 @@ const App: React.FC = () => {
     setProfile(guestUser);
     setIsGuestNamed(true);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(guestUser));
-    
-    if (isVIP) {
-      alert(`Welcome, VIP guest ${name}. The platform is unlocked for you.`);
-    }
   };
 
   const handleAdminAuth = (success: boolean) => {
@@ -153,6 +148,7 @@ const App: React.FC = () => {
     setIsAdmin(false);
     setShowHome(true);
     setActiveTab('jobs');
+    setIsProfileBannerDismissed(false);
   };
 
   const handleSaveProfile = (updatedProfile: UserProfile) => {
@@ -162,13 +158,6 @@ const App: React.FC = () => {
     }
     setProfile(updatedProfile);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedProfile));
-    
-    const users: UserProfile[] = JSON.parse(localStorage.getItem('afriassist_users') || '[]');
-    const index = users.findIndex(u => u.email === updatedProfile.email);
-    if (index !== -1) {
-      users[index] = updatedProfile;
-      localStorage.setItem('afriassist_users', JSON.stringify(users));
-    }
   };
 
   const handleSubscribe = (method: string) => {
@@ -225,6 +214,7 @@ const App: React.FC = () => {
       case 'coach': return <AccentCoach profile={profile} isLoggedIn={isLoggedIn || profile.isSubscribed} onLoginClick={() => setShowAuthModal(true)} />;
       case 'coach-live': return <LiveCoach profile={profile} />;
       case 'translate': return <Translator />;
+      case 'about': return <About />;
       case 'admin': return isAdmin ? <AdminPortal /> : <JobSearch profile={profile} isLoggedIn={isLoggedIn} onLoginClick={() => setShowAuthModal(true)} />;
       default: return <JobSearch profile={profile} isLoggedIn={isLoggedIn} onLoginClick={() => setShowAuthModal(true)} />;
     }
@@ -285,6 +275,41 @@ const App: React.FC = () => {
              </button>
            )}
         </div>
+
+        {/* Profile Completion Prompt Banner */}
+        {activeTab === 'jobs' && isProfileIncomplete && !isProfileBannerDismissed && (
+          <div className="mb-6 bg-orange-600 rounded-[2rem] p-6 lg:p-8 shadow-2xl animate-in slide-in-from-top-4 duration-500 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 -m-8 w-48 h-48 bg-white/10 rounded-full blur-3xl pointer-events-none transition-transform group-hover:scale-110"></div>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+               <div className="flex items-center space-x-4 text-center md:text-left">
+                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-2xl shadow-lg">🛠️</div>
+                  <div className="space-y-1">
+                    <h4 className="text-white font-black uppercase text-xs lg:text-sm tracking-widest italic">Enhance Your Matches</h4>
+                    <p className="text-orange-100 text-[10px] lg:text-xs font-bold leading-relaxed max-w-sm">
+                      Completing your <span className="underline decoration-orange-300">Location</span> and <span className="underline decoration-orange-300">Skills</span> allows our AI to find precisely the right opportunities for you.
+                    </p>
+                  </div>
+               </div>
+               <div className="flex items-center space-x-3 w-full md:w-auto">
+                 <button 
+                   onClick={() => setActiveTab('profile')}
+                   className="flex-1 md:flex-none bg-white text-orange-600 px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-orange-50 transition-all active:scale-95 whitespace-nowrap"
+                 >
+                   Setup Profile
+                 </button>
+                 <button 
+                   onClick={() => setIsProfileBannerDismissed(true)}
+                   className="bg-orange-700 text-orange-100 p-3 rounded-xl hover:bg-orange-800 transition-colors"
+                   title="Dismiss"
+                 >
+                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                   </svg>
+                 </button>
+               </div>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-[3rem] shadow-2xl overflow-hidden min-h-[75vh] flex flex-col border border-slate-100">
           {renderContent()}

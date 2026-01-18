@@ -86,7 +86,8 @@ const ResumeMaker: React.FC<ResumeMakerProps> = ({ profile, isLoggedIn, onLoginC
     setIsChatLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      // Fix: Initialize GoogleGenAI strictly using process.env.API_KEY directly as per guidelines.
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `You are the AfriAssist CV Assistant.

@@ -18,6 +18,7 @@ const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, isAdmin, isLog
     { id: 'coach', label: 'Analysis', icon: '🎙️' },
     { id: 'coach-live', label: 'Interview', icon: '⚡' },
     { id: 'translate', label: 'Speak', icon: '🔤' },
+    { id: 'about', label: 'About', icon: '💡' },
     { id: 'profile', label: 'Account', icon: '👤' },
   ];
 

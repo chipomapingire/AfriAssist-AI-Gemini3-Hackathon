@@ -34,7 +34,8 @@ const ChatWidget: React.FC<ChatWidgetProps> = ({ profile, onOpenSupport }) => {
     setLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      // Fix: Initialize GoogleGenAI strictly using process.env.API_KEY directly as per guidelines.
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: userMsg,

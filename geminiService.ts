@@ -3,8 +3,9 @@ import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { UserProfile } from "./types";
 
 // Always use getGeminiClient to ensure a fresh instance with the correct API key.
+// Fix: Initialize GoogleGenAI strictly using process.env.API_KEY directly as per guidelines.
 export const getGeminiClient = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+  return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 export interface SearchFilters {

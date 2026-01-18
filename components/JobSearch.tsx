@@ -16,6 +16,7 @@ const JobSearch: React.FC<JobSearchProps> = ({ profile, isLoggedIn, onLoginClick
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [showFilters, setShowFilters] = useState(false);
   const [showAlertsModal, setShowAlertsModal] = useState(false);
+  const [showFrequencyPrompt, setShowFrequencyPrompt] = useState(false);
   const [alerts, setAlerts] = useState<JobAlert[]>([]);
   const [filters, setFilters] = useState<SearchFilters>({
     experienceLevel: profile?.experienceLevel || '',
@@ -24,7 +25,7 @@ const JobSearch: React.FC<JobSearchProps> = ({ profile, isLoggedIn, onLoginClick
   });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ text: string, sources: any[], places?: any[] } | null>(null);
-  const [alertFrequency, setAlertFrequency] = useState<'daily' | 'weekly'>('daily');
+  const [selectedFrequency, setSelectedFrequency] = useState<'daily' | 'weekly'>('daily');
 
   useEffect(() => {
     if (profile?.experienceLevel) {
@@ -66,11 +67,15 @@ const JobSearch: React.FC<JobSearchProps> = ({ profile, isLoggedIn, onLoginClick
     }
   };
 
-  const saveAlert = () => {
+  const initiateSaveAlert = () => {
     if (!isLoggedIn) {
       onLoginClick?.();
       return;
     }
+    setShowFrequencyPrompt(true);
+  };
+
+  const confirmSaveAlert = () => {
     const newAlert: JobAlert = {
       id: Math.random().toString(36).substr(2, 9),
       query: query || "General Opportunities",
@@ -79,14 +84,14 @@ const JobSearch: React.FC<JobSearchProps> = ({ profile, isLoggedIn, onLoginClick
         industry: filters.industry || '',
         salaryRange: filters.salaryRange || ''
       },
-      frequency: alertFrequency,
+      frequency: selectedFrequency,
       createdAt: new Date().toISOString()
     };
     const updatedAlerts = [...alerts, newAlert];
     setAlerts(updatedAlerts);
     localStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(updatedAlerts));
-    alert("Alert configured!");
-    setShowAlertsModal(false);
+    alert(`Success! Your ${selectedFrequency} alert for "${newAlert.query}" is active.`);
+    setShowFrequencyPrompt(false);
   };
 
   const deleteAlert = (id: string) => {
@@ -124,17 +129,19 @@ const JobSearch: React.FC<JobSearchProps> = ({ profile, isLoggedIn, onLoginClick
             <p className="text-slate-500 text-xs lg:text-sm font-medium">Global jobs and local business hubs at your fingertips.</p>
           </div>
           <div className="flex space-x-2 items-center">
-            <button 
-              onClick={() => setShowAlertsModal(true)}
-              className="bg-white p-2.5 rounded-xl shadow-sm border border-slate-200 text-slate-500 relative"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              {alerts.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">{alerts.length}</span>
-              )}
-            </button>
+            {isLoggedIn && (
+              <button 
+                onClick={() => setShowAlertsModal(true)}
+                className="bg-white p-2.5 rounded-xl shadow-sm border border-slate-200 text-slate-500 relative hover:border-orange-500 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {alerts.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white">{alerts.length}</span>
+                )}
+              </button>
+            )}
             <div className="flex bg-white p-1 rounded-xl shadow-sm border border-slate-200">
               <button onClick={() => setViewMode('list')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest ${viewMode === 'list' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400'}`}>List</button>
               <button onClick={() => setViewMode('map')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest ${viewMode === 'map' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-400'}`}>Map</button>
@@ -175,7 +182,7 @@ const JobSearch: React.FC<JobSearchProps> = ({ profile, isLoggedIn, onLoginClick
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-[2] lg:flex-none bg-orange-600 text-white px-8 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-orange-700 disabled:bg-slate-300 transition-all shadow-xl active:scale-95"
+                className="bg-orange-600 text-white px-8 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-orange-700 disabled:bg-slate-300 transition-all shadow-xl active:scale-95"
               >
                 {loading ? '...' : 'Launch'}
               </button>
@@ -216,12 +223,17 @@ const JobSearch: React.FC<JobSearchProps> = ({ profile, isLoggedIn, onLoginClick
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 px-1">
             <div className="flex justify-between items-center mb-4">
                <h3 className="text-xs font-black text-slate-800 uppercase tracking-tighter">Market Results</h3>
-               <button 
-                 onClick={saveAlert}
-                 className="flex items-center space-x-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all active:scale-95"
-               >
-                 <span>Save Alert</span>
-               </button>
+               {isLoggedIn && (
+                 <button 
+                   onClick={initiateSaveAlert}
+                   className="flex items-center space-x-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all active:scale-95 hover:bg-orange-600"
+                 >
+                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
+                   </svg>
+                   <span>Save Alert</span>
+                 </button>
+               )}
             </div>
 
             {viewMode === 'list' ? (
@@ -275,6 +287,74 @@ const JobSearch: React.FC<JobSearchProps> = ({ profile, isLoggedIn, onLoginClick
           </div>
         )}
       </div>
+
+      {/* Frequency Prompt Modal */}
+      {showFrequencyPrompt && (
+        <div className="fixed inset-0 z-[210] bg-slate-900/90 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-white max-w-sm w-full rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+             <div className="bg-slate-900 p-8 text-center text-white">
+                <div className="text-4xl mb-2">🔔</div>
+                <h3 className="text-sm font-black uppercase tracking-widest italic">Alert Frequency</h3>
+                <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest">How often should we notify you?</p>
+             </div>
+             <div className="p-8 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                   <button 
+                     onClick={() => setSelectedFrequency('daily')}
+                     className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${selectedFrequency === 'daily' ? 'bg-orange-600 text-white border-orange-600 shadow-lg' : 'bg-slate-50 text-slate-400 border-transparent hover:bg-slate-100'}`}
+                   >
+                     Daily
+                   </button>
+                   <button 
+                     onClick={() => setSelectedFrequency('weekly')}
+                     className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${selectedFrequency === 'weekly' ? 'bg-orange-600 text-white border-orange-600 shadow-lg' : 'bg-slate-50 text-slate-400 border-transparent hover:bg-slate-100'}`}
+                   >
+                     Weekly
+                   </button>
+                </div>
+                <div className="flex gap-2 pt-2">
+                   <button onClick={() => setShowFrequencyPrompt(false)} className="flex-1 py-3 text-[10px] font-black uppercase text-slate-400 hover:text-slate-600">Cancel</button>
+                   <button onClick={confirmSaveAlert} className="flex-[2] bg-slate-900 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-xl hover:bg-orange-600 transition-all">Save Alert</button>
+                </div>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alerts Manager Modal */}
+      {showAlertsModal && (
+        <div className="fixed inset-0 z-[200] bg-slate-900/90 backdrop-blur-xl flex items-center justify-center p-4">
+           <div className="bg-white max-w-md w-full rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+              <div className="bg-slate-900 p-8 text-center relative text-white">
+                 <button onClick={() => setShowAlertsModal(false)} className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                 </button>
+                 <div className="text-3xl mb-2">⚡</div>
+                 <h3 className="text-sm font-black uppercase tracking-widest italic">Your Active Monitors</h3>
+              </div>
+              <div className="p-8 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                 {alerts.length === 0 ? (
+                   <p className="text-center text-slate-400 text-[10px] font-bold uppercase py-10">No active alerts configured.</p>
+                 ) : (
+                   alerts.map(alert => (
+                     <div key={alert.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <div className="flex-1 min-w-0">
+                           <p className="text-[10px] font-black text-slate-800 uppercase truncate">"{alert.query}"</p>
+                           <p className="text-[8px] text-orange-600 font-bold uppercase tracking-[0.2em]">{alert.frequency} updates</p>
+                        </div>
+                        <button onClick={() => deleteAlert(alert.id)} className="text-red-400 hover:text-red-600 p-2 transition-colors">
+                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                     </div>
+                   ))
+                 )}
+              </div>
+              <div className="p-6 bg-slate-50 border-t border-slate-100 text-center">
+                 <p className="text-[8px] text-slate-400 uppercase font-black">Syncing with AfriAssist Global Hub</p>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -49,7 +49,8 @@ const LiveCoach: React.FC<LiveCoachProps> = ({ profile }) => {
       setStatus('Initializing AI Coach...');
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+      // Fix: Initialize GoogleGenAI strictly using process.env.API_KEY directly as per guidelines.
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
